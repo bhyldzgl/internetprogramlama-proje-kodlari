@@ -41,3 +41,4 @@ public class SecurityConfig {
         return configuration.getAuthenticationManager();
     }
 }
+// react spring bootu bağlamak istiyorum , bunun için config sayfası oluşturmak istiyorum (cors).

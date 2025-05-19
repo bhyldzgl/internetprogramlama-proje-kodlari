@@ -1,5 +1,6 @@
 package com.habersitesi.controller;
 
+import com.habersitesi.dto.YorumGuncelleRequest;
 import com.habersitesi.dto.YorumRequest;
 import com.habersitesi.model.Yorum;
 import com.habersitesi.service.YorumService;
@@ -32,4 +33,15 @@ public class YorumController {
     public List<Yorum> habereYorumlar(@PathVariable Long haberId) {
         return yorumService.habereAitYorumlariGetir(haberId);
     }
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','EDITOR','UYE')")
+    public Yorum yorumGuncelle(@PathVariable Long id, @RequestBody YorumGuncelleRequest request) {
+        return yorumService.yorumGuncelle(id, request);
+    }
+    @GetMapping("/cevaplar/{yorumId}")
+    public List<Yorum> yorumCevaplari(@PathVariable Long yorumId) {
+        return yorumService.cevaplariGetir(yorumId);
+    }
+
+
 }

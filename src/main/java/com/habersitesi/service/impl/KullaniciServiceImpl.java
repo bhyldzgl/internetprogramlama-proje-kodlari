@@ -2,7 +2,9 @@ package com.habersitesi.service.impl;
 
 import com.habersitesi.dto.KullaniciGuncelleRequest;
 import com.habersitesi.dto.KullaniciResponse;
+import com.habersitesi.dto.SifreDegistirmeRequest;
 import com.habersitesi.exception.KullaniciBulunamadiException;
+import com.habersitesi.exception.YetkisizIslemException;
 import com.habersitesi.model.Kullanici;
 import com.habersitesi.repository.KullaniciRepository;
 import com.habersitesi.service.KullaniciService;
@@ -56,6 +58,28 @@ public class KullaniciServiceImpl implements KullaniciService {
 
         kullaniciRepository.save(kullanici);
     }
+    @Override
+    public void sifreDegistir(SifreDegistirmeRequest request) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Kullanici kullanici = kullaniciRepository.findByEmail(email)
+                .orElseThrow(() -> new KullaniciBulunamadiException(email));
+
+        if (!passwordEncoder.matches(request.getMevcutSifre(), kullanici.getSifre())) {
+            throw new YetkisizIslemException("Mevcut şifre hatalı.");
+        }
+
+        if (request.getYeniSifre() == null || request.getYeniSifre().isBlank()) {
+            throw new RuntimeException("Yeni şifre boş olamaz.");
+        }
+
+        if (passwordEncoder.matches(request.getYeniSifre(), kullanici.getSifre())) {
+            throw new RuntimeException("Yeni şifre, mevcut şifre ile aynı olamaz.");
+        }
+
+        kullanici.setSifre(passwordEncoder.encode(request.getYeniSifre()));
+        kullaniciRepository.save(kullanici);
+    }
+
 
 
 }

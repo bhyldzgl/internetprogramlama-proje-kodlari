@@ -2,18 +2,22 @@ package com.habersitesi.service.impl;
 
 import com.habersitesi.dto.HaberRequest;
 import com.habersitesi.exception.HaberBulunamadiException;
+import com.habersitesi.exception.KategoriBulunamadiException;
 import com.habersitesi.exception.KullaniciBulunamadiException;
 import com.habersitesi.exception.YetkisizIslemException;
 import com.habersitesi.model.*;
 import com.habersitesi.repository.*;
 import com.habersitesi.service.HaberService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.*;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +26,7 @@ public class HaberServiceImpl implements HaberService {
     private final HaberRepository haberRepository;
     private final KullaniciRepository kullaniciRepository;
     private final KategoriRepository kategoriRepository;
+    private final EtiketRepository etiketRepository;
 
     @Override
     public Haber haberYayinla(HaberRequest request) {
@@ -38,6 +43,16 @@ public class HaberServiceImpl implements HaberService {
         haber.setYayinTarihi(LocalDateTime.now());
         haber.setKategori(kategori);
         haber.setYazar(yazar);
+
+        if (request.getEtiketler() != null) {
+            Set<Etiket> etiketSet = new HashSet<>();
+            for (String etiketAd : request.getEtiketler()) {
+                Etiket etiket = etiketRepository.findByAdIgnoreCase(etiketAd)
+                        .orElseGet(() -> new Etiket(null, etiketAd, new HashSet<>()));
+                etiketSet.add(etiket);
+            }
+            haber.setEtiketler(etiketSet);
+        }
 
         return haberRepository.save(haber);
     }
@@ -61,6 +76,17 @@ public class HaberServiceImpl implements HaberService {
 
         haber.setBaslik(request.getBaslik());
         haber.setIcerik(request.getIcerik());
+
+        if (request.getEtiketler() != null) {
+            Set<Etiket> etiketSet = new HashSet<>();
+            for (String etiketAd : request.getEtiketler()) {
+                Etiket etiket = etiketRepository.findByAdIgnoreCase(etiketAd)
+                        .orElseGet(() -> new Etiket(null, etiketAd, new HashSet<>()));
+                etiketSet.add(etiket);
+            }
+            haber.setEtiketler(etiketSet);
+        }
+
         return haberRepository.save(haber);
     }
 
@@ -98,5 +124,48 @@ public class HaberServiceImpl implements HaberService {
         return haberRepository.findByYazar(yazar);
     }
 
+    @Override
+    public List<Haber> populerHaberleriGetir(int limit) {
+        return haberRepository.findPopulerHaberler(PageRequest.of(0, limit));
+    }
+
+    @Override
+    public Haber haberYayinlaGorselli(String baslik, String icerik, Long kategoriId, MultipartFile gorsel) throws IOException {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Kullanici yazar = kullaniciRepository.findByEmail(email)
+                .orElseThrow(() -> new KullaniciBulunamadiException(email));
+
+        Kategori kategori = kategoriRepository.findById(kategoriId)
+                .orElseThrow(() -> new KategoriBulunamadiException(kategoriId));
+
+        Haber haber = new Haber();
+        haber.setBaslik(baslik);
+        haber.setIcerik(icerik);
+        haber.setYayinTarihi(LocalDateTime.now());
+        haber.setKategori(kategori);
+        haber.setYazar(yazar);
+
+        if (gorsel != null && !gorsel.isEmpty()) {
+            String dosyaAdi = UUID.randomUUID() + "_" + gorsel.getOriginalFilename();
+            Path uploadPath = Paths.get("uploads");
+            Files.createDirectories(uploadPath);
+
+            Path dosyaYolu = uploadPath.resolve(dosyaAdi);
+            Files.copy(gorsel.getInputStream(), dosyaYolu, StandardCopyOption.REPLACE_EXISTING);
+
+            haber.setGorselYolu("/uploads/" + dosyaAdi);
+        }
+
+        return haberRepository.save(haber);
+    }
+
+    @Override
+    public List<Haber> kategoriVeKelimeyeGoreGetir(Long kategoriId, String kelime) {
+        return haberRepository.araKategoriyeGore(kategoriId, kelime);
+    }
+    @Override
+    public List<Haber> etiketeGoreGetir(String etiket) {
+        return haberRepository.findByEtiket(etiket);
+    }
 
 }
